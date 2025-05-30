@@ -1,6 +1,6 @@
 from bs4 import BeautifulSoup
 
-with open('diskwala_download_page.html', 'r', encoding='utf-8') as file:
+with open('diskwala_dump.html', 'r', encoding='utf-8') as file:
     soup = BeautifulSoup(file, 'html.parser')
 
 # Get file name
