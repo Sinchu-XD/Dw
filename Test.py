@@ -1,51 +1,46 @@
 import asyncio
 from playwright.async_api import async_playwright
 
-async def extract_video_url(url):
+async def extract_video_or_iframe(url):
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
         await page.goto(url, wait_until="networkidle")
 
-        # Wait for video tag or source
         try:
-            await page.wait_for_selector("video source", timeout=10000)
+            # First try for video source
+            await page.wait_for_selector("video source", timeout=5000)
             video_src = await page.get_attribute("video source", "src")
             if video_src:
+                print("[+] Direct video source found.")
                 return video_src
+        except:
+            print("[-] No direct video source found. Trying iframe...")
+
+        try:
+            iframe = await page.query_selector("iframe")
+            iframe_src = await iframe.get_attribute("src")
+            if iframe_src:
+                print(f"[+] Iframe source found: {iframe_src}")
+                return iframe_src
         except Exception as e:
-            print(f"Video source not found: {e}")
+            print(f"[-] Failed to get iframe: {e}")
             return None
         finally:
             await browser.close()
-
-
-async def download_video(video_url, output_file="diskwala_video.mp4"):
-    import requests
-    print(f"Downloading from: {video_url}")
-    try:
-        with requests.get(video_url, stream=True) as r:
-            r.raise_for_status()
-            with open(output_file, 'wb') as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    f.write(chunk)
-        print(f"Video downloaded as: {output_file}")
-    except Exception as e:
-        print(f"Download failed: {e}")
 
 
 if __name__ == "__main__":
     import sys
 
     if len(sys.argv) != 2:
-        print("Usage: python3 Dw.py <diskwala_url>")
+        print("Usage: python3 Test.py <diskwala_url>")
         sys.exit(1)
 
     url = sys.argv[1]
-    video_url = asyncio.run(extract_video_url(url))
+    extracted = asyncio.run(extract_video_or_iframe(url))
 
-    if video_url:
-        asyncio.run(download_video(video_url))
+    if extracted:
+        print(f"\n✅ Extracted URL: {extracted}")
     else:
-        print("Failed to extract video URL.")
-      
+        print("\n❌ Failed to extract video or iframe.")
