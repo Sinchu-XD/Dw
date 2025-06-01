@@ -11,55 +11,23 @@ headers = {
     )
 }
 
-def get_video_details(page_url):
-    response = requests.get(page_url, headers=headers)
+def print_all_meta_tags(url):
+    response = requests.get(url, headers=headers)
     if response.status_code != 200:
         print(f"Failed to fetch page: {response.status_code}")
-        return None
+        return
 
     soup = BeautifulSoup(response.text, 'html.parser')
 
-    details = {}
+    print("All meta tags:")
+    for meta in soup.find_all('meta'):
+        print(meta)
 
-    # Example 1: Get Title from <title> or <meta property="og:title">
-    title_tag = soup.find('title')
-    if title_tag:
-        details['title'] = title_tag.text.strip()
-    else:
-        og_title = soup.find('meta', property='og:title')
-        if og_title:
-            details['title'] = og_title.get('content', '').strip()
+    print("\nPotential uploader or date spans/divs:")
+    for tag in soup.find_all(['span', 'div']):
+        text = tag.get_text(strip=True)
+        if text and (len(text) < 50):  # small snippet text only
+            print(f"<{tag.name} class='{tag.get('class')}'>{text}</{tag.name}>")
 
-    # Example 2: Get Uploader Username - might be in a specific element
-    # You need to check the page's HTML, e.g., a span or a div with uploader info
-    uploader = soup.find('div', class_='uploader-name')  # Example class, change accordingly
-    if uploader:
-        details['uploader'] = uploader.text.strip()
-    else:
-        # Try alternative selectors or fallback
-        details['uploader'] = 'Unknown'
-
-    # Example 3: Get Duration - check if there's a meta tag or HTML span
-    duration = soup.find('meta', property='video:duration')
-    if duration:
-        details['duration'] = duration.get('content')
-    else:
-        duration_span = soup.find('span', class_='duration')  # Adjust class as needed
-        if duration_span:
-            details['duration'] = duration_span.text.strip()
-
-    # Example 4: Get Upload Date - meta tag or specific date element
-    upload_date = soup.find('meta', itemprop='uploadDate')
-    if upload_date:
-        details['upload_date'] = upload_date.get('content')
-    else:
-        date_span = soup.find('span', class_='upload-date')  # Adjust class as needed
-        if date_span:
-            details['upload_date'] = date_span.text.strip()
-
-    return details
-
-# Example usage:
-video_page_url = "https://www.diskwala.com/app/683aa235b42bb37213a69dd2"
-video_info = get_video_details(video_page_url)
-print(video_info)
+video_url = "YOUR_VIDEO_PAGE_URL"
+print_all_meta_tags(video_url)
