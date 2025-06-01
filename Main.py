@@ -1,8 +1,8 @@
 import asyncio
 from playwright.async_api import async_playwright
-import requests
+import re
 
-VIDEO_ID = "683aa235b42bb37213a69dd4"  # Replace with any DiskWala ID
+VIDEO_ID = "683aa235b42bb37213a69dd4"
 URL = f"https://www.diskwala.com/app/{VIDEO_ID}"
 
 async def run():
@@ -14,37 +14,30 @@ async def run():
         print(f"Opening URL: {URL}")
         await page.goto(URL)
 
-        # Wait for JS to load and API to be called
-        await page.wait_for_timeout(3000)
+        video_url_found = False
 
-        # Intercept the temp_info API response
+        def looks_like_video_url(url):
+            return re.search(r'\.(mp4|m3u8)(\?|$)', url)
+
+        # Log any response that looks like a video
         async def handle_response(response):
-            if "temp_info" in response.url and response.status == 200:
-                try:
-                    data = await response.json()
-                    print(f"\n✅ File Info:\n{data}\n")
-                    file_url = data.get("data", {}).get("file_url")
+            nonlocal video_url_found
+            url = response.url
+            if looks_like_video_url(url) and not video_url_found:
+                video_url_found = True
+                print(f"\n🎯 Possible Video URL Found:\n{url}\n")
 
-                    if file_url:
-                        print(f"🎯 Direct File URL: {file_url}")
-
-                        # Download the file
-                        download_file(file_url, VIDEO_ID + ".mp4")
-                    else:
-                        print("❌ File URL not found in response.")
-                except Exception as e:
-                    print(f"❌ Failed to parse JSON: {e}")
+                # Optional: download the video (only for direct .mp4)
+                if url.endswith(".mp4"):
+                    download_file(url, f"{VIDEO_ID}.mp4")
 
         page.on("response", handle_response)
 
-        # Reload to catch the API call
-        await page.reload()
-        await page.wait_for_timeout(5000)
-
+        await page.wait_for_timeout(10000)
         await browser.close()
 
-
 def download_file(url, filename):
+    import requests
     print(f"⬇️ Downloading {filename} ...")
     try:
         with requests.get(url, stream=True) as r:
@@ -55,7 +48,6 @@ def download_file(url, filename):
         print(f"✅ Download complete: {filename}")
     except Exception as e:
         print(f"❌ Error downloading file: {e}")
-
 
 if __name__ == "__main__":
     asyncio.run(run())
