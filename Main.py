@@ -1,5 +1,6 @@
 import asyncio
 from playwright.async_api import async_playwright
+import json
 
 async def dump_scripts(url):
     async with async_playwright() as p:
@@ -13,17 +14,18 @@ async def dump_scripts(url):
 
         scripts = await page.query_selector_all("script")
 
-        found = False
+        count = 0
         for script in scripts:
             content = await script.text_content()
-            if content and ("fileInfo" in content or "video" in content or "url" in content):
-                found = True
-                print("--- Script Content Snippet ---")
-                print(content[:1000])  # print first 1000 chars
-                print("------------------------------\n")
+            if content and len(content) > 500:
+                count += 1
+                print(f"\n--- Script #{count} Content ({len(content)} chars) ---")
+                snippet = content[:1500]
+                print(snippet)
+                print("------------------------------")
 
-        if not found:
-            print("No relevant <script> tags found containing 'fileInfo' or 'video' keywords.")
+        if count == 0:
+            print("No large <script> tags found.")
 
         await browser.close()
 
