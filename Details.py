@@ -11,27 +11,48 @@ headers = {
     )
 }
 
-def get_video_details_jsonld(page_url):
+def get_video_details(page_url):
     response = requests.get(page_url, headers=headers)
     if response.status_code != 200:
         print(f"Failed to fetch page: {response.status_code}")
         return None
 
     soup = BeautifulSoup(response.text, 'html.parser')
-    scripts = soup.find_all('script', type='application/ld+json')
-    for script in scripts:
-        try:
-            data = json.loads(script.string)
-            if isinstance(data, dict) and data.get('@type') == 'VideoObject':
-                return {
-                    'title': data.get('name'),
-                    'uploader': data.get('author', {}).get('name'),
-                    'duration': data.get('duration'),
-                    'upload_date': data.get('uploadDate'),
-                }
-        except Exception:
-            continue
-    return None
 
+    # Extract title from page title or video title tag
+    title = soup.find("h1")
+    if title:
+        title = title.get_text(strip=True)
+    else:
+        title = soup.title.string.strip() if soup.title else "Unknown"
+
+    # Extract uploader
+    uploader = soup.find("a", href=lambda x: x and "/user/" in x)
+    uploader = uploader.get_text(strip=True) if uploader else "Unknown"
+
+    # Duration (if present)
+    duration = soup.find("span", class_="video-duration")
+    duration = duration.get_text(strip=True) if duration else "Unknown"
+
+    # Upload date (if present in a meta tag or visible span)
+    upload_date = None
+    for meta in soup.find_all("meta"):
+        if meta.get("property") == "video:release_date":
+            upload_date = meta.get("content")
+            break
+    if not upload_date:
+        # Try fallback span
+        date_span = soup.find("span", class_="upload-date")
+        upload_date = date_span.get_text(strip=True) if date_span else "Unknown"
+
+    return {
+        "title": title,
+        "uploader": uploader,
+        "duration": duration,
+        "upload_date": upload_date
+    }
+
+# Example usage
 video_url = "https://www.diskwala.com/app/683aa235b42bb37213a69dd2"
-get_video_details_jsonld(video_url)
+details = get_video_details(video_url)
+print(details)
