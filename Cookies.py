@@ -1,6 +1,7 @@
 import requests
+import uuid
 
-# Define headers with your full cookie
+# Your full headers with cookies and User-Agent
 headers = {
     "User-Agent": "Mozilla/5.0",
     "Accept": "application/json, text/plain, */*",
@@ -13,23 +14,19 @@ headers = {
     )
 }
 
-
 def download_video(video_url):
-    response = requests.get(video_url, headers=headers)
-    if response.status_code == 200:
-        filename = "video.mp4"
-        with open(filename, "wb") as f:
-            f.write(response.content)
-        return filename
-    else:
+    try:
+        response = requests.get(video_url, headers=headers, stream=True, timeout=30)
+        if response.status_code == 200:
+            filename = f"video_{uuid.uuid4().hex[:8]}.mp4"
+            with open(filename, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+            return filename
+        else:
+            print(f"Failed to download video, status code: {response.status_code}")
+            return None
+    except Exception as e:
+        print(f"Error downloading video: {e}")
         return None
-        
-# Fetch the video page (or JSON)
-#response = requests.get(video_url, headers=headers)
-
-#if response.status_code == 200:
-#    with open("downloaded_video.mp4", "wb") as f:
-#        f.write(response.content)
-#    print("✅ Video downloaded successfully!")
-#else:
-#    print(f"❌ Failed to fetch video. Status code: {response.status_code}")
