@@ -1,8 +1,5 @@
 import requests
 
-# Define the target URL
-video_url = "https://www.diskwala.com/app/683aa235b42bb37213a69dd4"
-
 # Define headers with your full cookie
 headers = {
     "User-Agent": "Mozilla/5.0",
@@ -16,7 +13,6 @@ headers = {
     )
 }
 
-import requests
 
 def download_video(video_url):
     response = requests.get(video_url, headers=headers)
@@ -29,11 +25,11 @@ def download_video(video_url):
         return None
         
 # Fetch the video page (or JSON)
-response = requests.get(video_url, headers=headers)
+#response = requests.get(video_url, headers=headers)
 
-if response.status_code == 200:
-    with open("downloaded_video.mp4", "wb") as f:
-        f.write(response.content)
-    print("✅ Video downloaded successfully!")
-else:
-    print(f"❌ Failed to fetch video. Status code: {response.status_code}")
+#if response.status_code == 200:
+#    with open("downloaded_video.mp4", "wb") as f:
+#        f.write(response.content)
+#    print("✅ Video downloaded successfully!")
+#else:
+#    print(f"❌ Failed to fetch video. Status code: {response.status_code}")
