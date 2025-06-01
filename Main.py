@@ -1,53 +1,63 @@
 import asyncio
 from playwright.async_api import async_playwright
-import re
+from bs4 import BeautifulSoup
 
-VIDEO_ID = "683aa235b42bb37213a69dd4"
-URL = f"https://www.diskwala.com/app/{VIDEO_ID}"
-
-async def run():
+async def dump_and_scrape(url):
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context()
         page = await context.new_page()
 
-        print(f"Opening URL: {URL}")
-        await page.goto(URL)
+        page.on("console", lambda msg: print(f"Console: {msg.type}: {msg.text}"))
+        page.on("request", lambda request: print(f"Request: {request.method} {request.url}"))
+        page.on("response", lambda response: print(f"Response: {response.status} {response.url}"))
 
-        video_url_found = False
+        print(f"Opening URL: {url}")
+        await page.goto(url, wait_until="networkidle")
+        await page.wait_for_timeout(8000)
 
-        def looks_like_video_url(url):
-            return re.search(r'\.(mp4|m3u8)(\?|$)', url)
+        html = await page.content()
+        with open("diskwala_download_page.html", "w", encoding="utf-8") as f:
+            f.write(html)
+        print("✅ Page HTML dumped to diskwala_download_page.html")
 
-        # Log any response that looks like a video
-        async def handle_response(response):
-            nonlocal video_url_found
-            url = response.url
-            if looks_like_video_url(url) and not video_url_found:
-                video_url_found = True
-                print(f"\n🎯 Possible Video URL Found:\n{url}\n")
+        soup = BeautifulSoup(html, "html.parser")
+        file_name = soup.find_all('p', class_='MuiTypography-body1')
+        file_name = file_name[0].text if file_name else 'Not found'
+        file_type = soup.find('span', class_='MuiTypography-caption')
+        file_type = file_type.text if file_type else 'Not found'
+        uploader = soup.find_all('h6', class_='MuiTypography-h6')
+        uploader = uploader[1].text.replace("File By: ", "") if len(uploader) > 1 else 'Not found'
 
-                # Optional: download the video (only for direct .mp4)
-                if url.endswith(".mp4"):
-                    download_file(url, f"{VIDEO_ID}.mp4")
+        print(f"\n📄 File Info:\nFile Name: {file_name}\nFile Type: {file_type}\nUploaded By: {uploader}")
 
-        page.on("response", handle_response)
+        # Try <video> src
+        try:
+            video_src = await page.eval_on_selector("video", "el => el.src")
+        except Exception:
+            video_src = None
 
-        await page.wait_for_timeout(10000)
+        # If not found, try <video><source> src
+        if not video_src:
+            try:
+                video_src = await page.eval_on_selector("video source", "el => el.src")
+            except Exception:
+                video_src = None
+
+        if video_src:
+            print(f"\n🎬 Video src found: {video_src}")
+        else:
+            print("❌ No video src found in <video> or <source> tags.")
+
+        await page.screenshot(path="page_screenshot.png", full_page=True)
+        print("📸 Full page screenshot saved as page_screenshot.png")
+
         await browser.close()
 
-def download_file(url, filename):
-    import requests
-    print(f"⬇️ Downloading {filename} ...")
-    try:
-        with requests.get(url, stream=True) as r:
-            r.raise_for_status()
-            with open(filename, "wb") as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    f.write(chunk)
-        print(f"✅ Download complete: {filename}")
-    except Exception as e:
-        print(f"❌ Error downloading file: {e}")
-
 if __name__ == "__main__":
-    asyncio.run(run())
+    import sys
+    if len(sys.argv) != 2:
+        print("Usage: python3 Main.py <diskwala_url>")
+        sys.exit(1)
+    url = sys.argv[1]
+    asyncio.run(dump_and_scrape(url))
