@@ -16,6 +16,18 @@ headers = {
     )
 }
 
+import requests
+
+def download_video(video_url):
+    response = requests.get(video_url, headers=headers)
+    if response.status_code == 200:
+        filename = "video.mp4"
+        with open(filename, "wb") as f:
+            f.write(response.content)
+        return filename
+    else:
+        return None
+        
 # Fetch the video page (or JSON)
 response = requests.get(video_url, headers=headers)
 
