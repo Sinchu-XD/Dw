@@ -1,4 +1,4 @@
-import asyncioAdd commentMore actions
+import asyncio
 from playwright.async_api import async_playwright
 
 async def dump_html(url):
