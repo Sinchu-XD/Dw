@@ -50,7 +50,7 @@ async def handle_link(client: Client, message: Message):
         return
 
     url = message.text.strip()
-    if "terabox.com" not in url:
+    if "teraboxlink.com" not in url:
         await message.reply_text("❌ Invalid link. Send a valid TeraBox link.")
         return
 
