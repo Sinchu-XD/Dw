@@ -71,7 +71,7 @@ async def start_download(client: Client, message: Message):
         return
 
     url = text[1]
-    if "terabox.com" not in url:
+    if "teraboxlink.com" not in url:
         await message.reply_text("❌ That doesn’t look like a TeraBox link.")
         return
 
