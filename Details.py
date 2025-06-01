@@ -60,6 +60,6 @@ def get_video_details(page_url):
     return details
 
 # Example usage:
-video_page_url = "https://diskwala.com/your-video-page-url"
+video_page_url = "https://www.diskwala.com/app/683aa235b42bb37213a69dd2"
 video_info = get_video_details(video_page_url)
 print(video_info)
