@@ -1,58 +1,47 @@
-import requests
-from bs4 import BeautifulSoup
-import json
+import asyncio
+from playwright.async_api import async_playwright
 
-headers = {
-    "User-Agent": "Mozilla/5.0",
-    "Cookie": (
-        "_ga=GA1.1.468420041.1748796491; "
-        "rT=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODNjN2ViNmI0MmJiMzcyMTNhZTFkNTgiLCJuYW1lIjoiQWJoaSIsImVtYWlsIjoiYWJoaXNoZWtiYW5zaGl3YWwyMDA1QGdtYWlsLmNvbSIsInB1YmxpY19kZXRhaWxzIjp7InRpdGxlIjoiIiwibGluayI6IiIsImxvZ28iOiIifSwiZV92Ijp0cnVlLCJkX2EiOmZhbHNlLCJibG9ja2VkIjpmYWxzZSwicGFzc3dvcmQiOiIkMmEkMTAkU0tHY0NWQmdCbzJpZXJXV0VEV0dhZTJxRXJqSW9xR3g0L0w1VGRrQ25BSjBQd0JjcGlXdnEiLCJpYXQiOjE3NDg3OTY1MzgsImV4cCI6MTc0ODg4MjkzOH0.il07nKAxyLZjntr8GB_j2j5TkcMObJ1U1QKOH8y-OAs; "
-        "_ga_9CY1MQHST7=GS2.1.s1748796490$o1$g1$t1748797215$j59$l0$h0"
-    )
+cookies = {
+    "name": "rT",
+    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODNjN2ViNmI0MmJiMzcyMTNhZTFkNTgiLCJuYW1lIjoiQWJoaSIsImVtYWlsIjoiYWJoaXNoZWtiYW5zaGl3YWwyMDA1QGdtYWlsLmNvbSIsInB1YmxpY19kZXRhaWxzIjp7InRpdGxlIjoiIiwibGluayI6IiIsImxvZ28iOiIifSwiZV92Ijp0cnVlLCJkX2EiOmZhbHNlLCJibG9ja2VkIjpmYWxzZSwicGFzc3dvcmQiOiIkMmEkMTAkU0tHY0NWQmdCbzJpZXJXV0VEV0dhZTJxRXJqSW9xR3g0L0w1VGRrQ25BSjBQd0JjcGlXdnEiLCJpYXQiOjE3NDg3OTY1MzgsImV4cCI6MTc0ODg4MjkzOH0.il07nKAxyLZjntr8GB_j2j5TkcMObJ1U1QKOH8y-OAs",
+    "domain": "diskwala.com",
+    "path": "/",
+    "httpOnly": False,
+    "secure": False
 }
 
-def get_video_details(page_url):
-    response = requests.get(page_url, headers=headers)
-    if response.status_code != 200:
-        print(f"Failed to fetch page: {response.status_code}")
-        return None
+async def get_video_details(url):
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context()
+        await context.add_cookies([cookies])
+        page = await context.new_page()
+        await page.goto(url, wait_until="networkidle")
 
-    soup = BeautifulSoup(response.text, 'html.parser')
+        title = await page.title()
+        try:
+            uploader = await page.inner_text("a[href^='/user/']")
+        except:
+            uploader = "Unknown"
+        try:
+            duration = await page.inner_text(".video-duration")
+        except:
+            duration = "Unknown"
+        try:
+            upload_date = await page.inner_text(".upload-date")
+        except:
+            upload_date = "Unknown"
 
-    # Extract title from page title or video title tag
-    title = soup.find("h1")
-    if title:
-        title = title.get_text(strip=True)
-    else:
-        title = soup.title.string.strip() if soup.title else "Unknown"
+        await browser.close()
 
-    # Extract uploader
-    uploader = soup.find("a", href=lambda x: x and "/user/" in x)
-    uploader = uploader.get_text(strip=True) if uploader else "Unknown"
+        return {
+            "title": title,
+            "uploader": uploader,
+            "duration": duration,
+            "upload_date": upload_date
+        }
 
-    # Duration (if present)
-    duration = soup.find("span", class_="video-duration")
-    duration = duration.get_text(strip=True) if duration else "Unknown"
-
-    # Upload date (if present in a meta tag or visible span)
-    upload_date = None
-    for meta in soup.find_all("meta"):
-        if meta.get("property") == "video:release_date":
-            upload_date = meta.get("content")
-            break
-    if not upload_date:
-        # Try fallback span
-        date_span = soup.find("span", class_="upload-date")
-        upload_date = date_span.get_text(strip=True) if date_span else "Unknown"
-
-    return {
-        "title": title,
-        "uploader": uploader,
-        "duration": duration,
-        "upload_date": upload_date
-    }
-
-# Example usage
+# Run the function
 video_url = "https://www.diskwala.com/app/683aa235b42bb37213a69dd2"
-details = get_video_details(video_url)
-print(details)
+result = asyncio.run(get_video_details(video_url))
+print(result)
