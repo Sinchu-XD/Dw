@@ -29,5 +29,5 @@ def print_all_meta_tags(url):
         if text and (len(text) < 50):  # small snippet text only
             print(f"<{tag.name} class='{tag.get('class')}'>{text}</{tag.name}>")
 
-video_url = "YOUR_VIDEO_PAGE_URL"
+video_url = "https://www.diskwala.com/app/683aa235b42bb37213a69dd2"
 print_all_meta_tags(video_url)
