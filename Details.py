@@ -34,4 +34,4 @@ def get_video_details_jsonld(page_url):
     return None
 
 video_url = "https://www.diskwala.com/app/683aa235b42bb37213a69dd2"
-print_all_meta_tags(video_url)
+get_video_details_jsonld(video_url)
