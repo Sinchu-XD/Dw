@@ -8,11 +8,7 @@ headers = {
     "Referer": "https://www.diskwala.com/",
     "Origin": "https://www.diskwala.com",
     "Cookie": "_ga=GA1.1.63933014.1748794995; "
-              "rT=eyJhbGciOiJIUzI1NilsInR5cCl6lkpXVCJ9.eyJfaWQiOiI2ODNjN2ViNml0MmJiMzcyMTNhZTFKNTgiLC"
-              "JuYW1lIjoiQWJoaSIsImVtYWlsljoiYWJoaXNoZWtYW5zaGI3YWwyMDA1QGdtYWlsLmNvbSIsInB1YmxpY19kZXRh"
-              "aWxzljp7InRpdGxlljoiliwibGluayl6lilslmxvZ28iOilifSwiZV921jpmYWxzZSwiZF9hIjpmYWxzZSwiYmxvY2tl"
-              "ZCI6ZmFsc2UsInBhc3N3b3JkljoiJDJhJDEWJFNLR2NDVKJnQm8yaWVyV1dFRFdHYWUycUVyaklvcUd4NC9MNVRka0NuQU"
-              "owUHdCY3BpV3ZxliwiaWF0ljoxNzQ4Nzk1MDc3LCJleHAiOjE3NDg4ODEONzd9.PmlYg0GBIIVgd4p4GXB-RKU700QlabRCiv-iSel-OAI; "
+              "rT=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODNjN2ViNmI0MmJiMzcyMTNhZTFkNTgiLCJuYW1lIjoiQWJoaSIsImVtYWlsIjoiYWJoaXNoZWtiYW5zaGl3YWwyMDA1QGdtYWlsLmNvbSIsInB1YmxpY19kZXRhaWxzIjp7InRpdGxlIjoiIiwibGluayI6IiIsImxvZ28iOiIifSwiZV92Ijp0cnVlLCJkX2EiOmZhbHNlLCJibG9ja2VkIjpmYWxzZSwicGFzc3dvcmQiOiIkMmEkMTAkU0tHY0NWQmdCbzJpZXJXV0VEV0dhZTJxRXJqSW9xR3g0L0w1VGRrQ25BSjBQd0JjcGlXdnEiLCJpYXQiOjE3NDg3OTY1MzgsImV4cCI6MTc0ODg4MjkzOH0.il07nKAxyLZjntr8GB_j2j5TkcMObJ1U1QKOH8y-OAs"
               "_ga_9CY1MQHST7=GS2.1.s1748794995$o1$g1$t1748795526$j60$10$h0"
 }
 
