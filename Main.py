@@ -3,46 +3,68 @@ from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 import requests
 import sys
+import re
 
 async def dump_and_scrape(url):
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
         await page.goto(url, wait_until="networkidle")
-        await page.wait_for_timeout(5000)
+        await page.wait_for_timeout(7000)  # extra wait
 
-        # Grab HTML for backup/debug
         html_content = await page.content()
         with open("diskwala_download_page.html", "w", encoding="utf-8") as f:
             f.write(html_content)
         print("✅ Page HTML dumped to diskwala_download_page.html")
 
-        # Try to extract video src directly from <video> or <source>
-        video_src = await page.eval_on_selector("video source", "el => el.src")  # Try <source>
-        if not video_src:
-            video_src = await page.eval_on_selector("video", "el => el.src")  # Fallback to <video src="">
+        # Now parse HTML using BeautifulSoup
+        soup = BeautifulSoup(html_content, 'html.parser')
 
-        # Get file name, type, uploader
-        file_name = await page.text_content("p.MuiTypography-body1")
-        file_type = await page.text_content("span.MuiTypography-caption")
-        uploader = await page.text_content("h6.MuiTypography-h6:nth-of-type(2)")
+        # Extract File Name
+        name_tag = soup.find('p', class_='MuiTypography-body1')
+        file_name = name_tag.text.strip() if name_tag else 'Not Found'
 
-        if uploader:
-            uploader = uploader.replace("File By: ", "")
+        # Extract File Type
+        type_tag = soup.find('span', class_='MuiTypography-caption')
+        file_type = type_tag.text.strip() if type_tag else 'Not Found'
+
+        # Extract Uploader
+        uploader_tags = soup.find_all('h6', class_='MuiTypography-h6')
+        uploader = uploader_tags[1].text.replace("File By: ", "").strip() if len(uploader_tags) > 1 else 'Not Found'
 
         print(f"\n📄 File Info:")
-        print(f"File Name: {file_name or 'Not Found'}")
-        print(f"File Type: {file_type or 'Not Found'}")
-        print(f"Uploaded By: {uploader or 'Not Found'}")
+        print(f"File Name: {file_name}")
+        print(f"File Type: {file_type}")
+        print(f"Uploaded By: {uploader}")
 
-        if video_src:
-            print(f"🎥 Video URL: {video_src}")
-            safe_name = (file_name or "video").replace(" ", "_").replace("/", "_")
-            ext = (file_type or "mp4").split("/")[-1]
+        # Try finding video URL inside <video> or <source> or JS data
+        video_url = None
+
+        # Attempt 1: <video src="">
+        video_tag = soup.find("video")
+        if video_tag and video_tag.get("src"):
+            video_url = video_tag["src"]
+
+        # Attempt 2: <source src="">
+        if not video_url:
+            source_tag = soup.find("source")
+            if source_tag and source_tag.get("src"):
+                video_url = source_tag["src"]
+
+        # Attempt 3: Raw search in JS data
+        if not video_url:
+            raw_urls = re.findall(r'https://[^\'" ]+\.mp4', html_content)
+            if raw_urls:
+                video_url = raw_urls[0]
+
+        if video_url:
+            print(f"🎥 Video URL: {video_url}")
+            safe_name = file_name.replace(" ", "_").replace("/", "_")
+            ext = (file_type.split("/")[-1]) if "/" in file_type else "mp4"
             output_file = f"{safe_name}.{ext}"
-            download_video(video_src, output_file)
+            download_video(video_url, output_file)
         else:
-            print("❌ Video URL not found in the page (JS-loaded or obfuscated).")
+            print("❌ Video URL not found in the HTML.")
 
         await browser.close()
 
