@@ -1,55 +1,61 @@
 import asyncio
 from playwright.async_api import async_playwright
-from bs4 import BeautifulSoup
+import requests
 
-async def dump_and_scrape(url):
+VIDEO_ID = "683aa235b42bb37213a69dd4"  # Replace with any DiskWala ID
+URL = f"https://www.diskwala.com/app/{VIDEO_ID}"
+
+async def run():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context()
         page = await context.new_page()
 
-        # Listen to console logs
-        page.on("console", lambda msg: print(f"Console: {msg.type}: {msg.text}"))
+        print(f"Opening URL: {URL}")
+        await page.goto(URL)
 
-        # Listen to all requests & responses for debug
-        page.on("request", lambda request: print(f"Request: {request.method} {request.url}"))
-        page.on("response", lambda response: print(f"Response: {response.status} {response.url}"))
+        # Wait for JS to load and API to be called
+        await page.wait_for_timeout(3000)
 
-        await page.goto(url, wait_until="networkidle")
-        await page.wait_for_timeout(8000)
+        # Intercept the temp_info API response
+        async def handle_response(response):
+            if "temp_info" in response.url and response.status == 200:
+                try:
+                    data = await response.json()
+                    print(f"\n✅ File Info:\n{data}\n")
+                    file_url = data.get("data", {}).get("file_url")
 
-        html = await page.content()
-        with open("diskwala_download_page.html", "w", encoding="utf-8") as f:
-            f.write(html)
-        print("✅ Page HTML dumped to diskwala_download_page.html")
+                    if file_url:
+                        print(f"🎯 Direct File URL: {file_url}")
 
-        soup = BeautifulSoup(html, "html.parser")
-        file_name = soup.find_all('p', class_='MuiTypography-body1')
-        file_name = file_name[0].text if file_name else 'Not found'
-        file_type = soup.find('span', class_='MuiTypography-caption')
-        file_type = file_type.text if file_type else 'Not found'
-        uploader = soup.find_all('h6', class_='MuiTypography-h6')
-        uploader = uploader[1].text.replace("File By: ", "") if len(uploader) > 1 else 'Not found'
+                        # Download the file
+                        download_file(file_url, VIDEO_ID + ".mp4")
+                    else:
+                        print("❌ File URL not found in response.")
+                except Exception as e:
+                    print(f"❌ Failed to parse JSON: {e}")
 
-        print(f"\n📄 File Info:\nFile Name: {file_name}\nFile Type: {file_type}\nUploaded By: {uploader}")
+        page.on("response", handle_response)
 
-        # Try to get video src from <video> tags
-        video_src = await page.eval_on_selector("video", "el => el.src").catch(lambda _: None)
-        if video_src:
-            print(f"\n🎬 Video src from <video>: {video_src}")
-        else:
-            print("❌ No <video> src found.")
-
-        # Screenshot full page for manual inspection if needed
-        await page.screenshot(path="page_screenshot.png", full_page=True)
-        print("📸 Full page screenshot saved as page_screenshot.png")
+        # Reload to catch the API call
+        await page.reload()
+        await page.wait_for_timeout(5000)
 
         await browser.close()
 
+
+def download_file(url, filename):
+    print(f"⬇️ Downloading {filename} ...")
+    try:
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            with open(filename, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+        print(f"✅ Download complete: {filename}")
+    except Exception as e:
+        print(f"❌ Error downloading file: {e}")
+
+
 if __name__ == "__main__":
-    import sys
-    if len(sys.argv) != 2:
-        print("Usage: python3 Main.py <diskwala_url>")
-        sys.exit(1)
-    url = sys.argv[1]
-    asyncio.run(dump_and_scrape(url))
+    asyncio.run(run())
