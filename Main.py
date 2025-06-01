@@ -1,63 +1,67 @@
 import asyncio
 from playwright.async_api import async_playwright
-from bs4 import BeautifulSoup
+import re
 
-async def dump_and_scrape(url):
+async def get_video_url(diskwala_url):
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context()
         page = await context.new_page()
 
-        page.on("console", lambda msg: print(f"Console: {msg.type}: {msg.text}"))
-        page.on("request", lambda request: print(f"Request: {request.method} {request.url}"))
-        page.on("response", lambda response: print(f"Response: {response.status} {response.url}"))
+        print(f"Opening URL: {diskwala_url}")
+        await page.goto(diskwala_url)
 
-        print(f"Opening URL: {url}")
-        await page.goto(url, wait_until="networkidle")
-        await page.wait_for_timeout(8000)
+        # Wait for JS to fully load
+        await page.wait_for_load_state('networkidle')
 
-        html = await page.content()
-        with open("diskwala_download_page.html", "w", encoding="utf-8") as f:
-            f.write(html)
-        print("✅ Page HTML dumped to diskwala_download_page.html")
-
-        soup = BeautifulSoup(html, "html.parser")
-        file_name = soup.find_all('p', class_='MuiTypography-body1')
-        file_name = file_name[0].text if file_name else 'Not found'
-        file_type = soup.find('span', class_='MuiTypography-caption')
-        file_type = file_type.text if file_type else 'Not found'
-        uploader = soup.find_all('h6', class_='MuiTypography-h6')
-        uploader = uploader[1].text.replace("File By: ", "") if len(uploader) > 1 else 'Not found'
-
-        print(f"\n📄 File Info:\nFile Name: {file_name}\nFile Type: {file_type}\nUploaded By: {uploader}")
-
-        # Try <video> src
+        # Extract fileInfo using JavaScript object from global JS context
         try:
-            video_src = await page.eval_on_selector("video", "el => el.src")
-        except Exception:
-            video_src = None
+            data = await page.evaluate("""() => {
+                return window.__NUXT__.state[1].data[0]
+            }""")
+        except Exception as e:
+            print("❌ Failed to extract video metadata:", e)
+            return
 
-        # If not found, try <video><source> src
-        if not video_src:
-            try:
-                video_src = await page.eval_on_selector("video source", "el => el.src")
-            except Exception:
-                video_src = None
+        if not data or 'fileInfo' not in data:
+            print("❌ Video metadata not found.")
+            return
 
-        if video_src:
-            print(f"\n🎬 Video src found: {video_src}")
-        else:
-            print("❌ No video src found in <video> or <source> tags.")
+        file_info = data['fileInfo']
+        uploader = data.get('uploader', {})
 
-        await page.screenshot(path="page_screenshot.png", full_page=True)
-        print("📸 Full page screenshot saved as page_screenshot.png")
+        print("\n✅ File Info:")
+        print(file_info)
+
+        u_id = file_info.get('u_id')
+        file_name = file_info.get('name')
+        extension = file_info.get('extension', 'mp4')
+
+        # Clean the filename (DiskWala sometimes obfuscates it)
+        safe_name = re.sub(r'[^\w\-_.]', '', file_name)
+
+        # Construct CDN URL
+        cdn_url = f"https://cdn.diskvideos.com/videos/{u_id}/{safe_name}.{extension}"
+
+        print(f"\n✅ Possible Video URL:\n{cdn_url}")
+
+        # Optional: verify URL by opening in new tab
+        video_check = await context.new_page()
+        try:
+            response = await video_check.goto(cdn_url)
+            if response and response.status == 200:
+                print("\n🎉 Direct Video URL is valid and ready to download.")
+            else:
+                print("\n⚠️ Video URL might be invalid or expired.")
+        except Exception as e:
+            print("\n❌ Error verifying video URL:", e)
 
         await browser.close()
 
 if __name__ == "__main__":
     import sys
     if len(sys.argv) != 2:
-        print("Usage: python3 Main.py <diskwala_url>")
-        sys.exit(1)
-    url = sys.argv[1]
-    asyncio.run(dump_and_scrape(url))
+        print("Usage: python3 Main.py <DiskWala Video URL>")
+    else:
+        url = sys.argv[1]
+        asyncio.run(get_video_url(url))
