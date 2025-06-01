@@ -11,23 +11,27 @@ headers = {
     )
 }
 
-def print_all_meta_tags(url):
-    response = requests.get(url, headers=headers)
+def get_video_details_jsonld(page_url):
+    response = requests.get(page_url, headers=headers)
     if response.status_code != 200:
         print(f"Failed to fetch page: {response.status_code}")
-        return
+        return None
 
     soup = BeautifulSoup(response.text, 'html.parser')
-
-    print("All meta tags:")
-    for meta in soup.find_all('meta'):
-        print(meta)
-
-    print("\nPotential uploader or date spans/divs:")
-    for tag in soup.find_all(['span', 'div']):
-        text = tag.get_text(strip=True)
-        if text and (len(text) < 50):  # small snippet text only
-            print(f"<{tag.name} class='{tag.get('class')}'>{text}</{tag.name}>")
+    scripts = soup.find_all('script', type='application/ld+json')
+    for script in scripts:
+        try:
+            data = json.loads(script.string)
+            if isinstance(data, dict) and data.get('@type') == 'VideoObject':
+                return {
+                    'title': data.get('name'),
+                    'uploader': data.get('author', {}).get('name'),
+                    'duration': data.get('duration'),
+                    'upload_date': data.get('uploadDate'),
+                }
+        except Exception:
+            continue
+    return None
 
 video_url = "https://www.diskwala.com/app/683aa235b42bb37213a69dd2"
 print_all_meta_tags(video_url)
