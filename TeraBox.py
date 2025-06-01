@@ -23,7 +23,7 @@ async def get_direct_link(terabox_url: str) -> str:
     For now, this simulates that step.
     """
     # TODO: Replace this with actual scraping logic
-    return "https://example.com/simulated-download-file.mp4"
+    return "https://teraboxlink.com/s/1_gOh4YzXqinDw1hu8IAHVg"
 
 async def download_file(session: aiohttp.ClientSession, url: str, dest: str):
     async with session.get(url) as resp:
