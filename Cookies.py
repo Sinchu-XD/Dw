@@ -1,7 +1,7 @@
 import requests
 
 # Define the target URL
-url = "https://udapi.diskwala.com/api/v1/auth"
+video_url = "https://www.diskwala.com/app/683aa235b42bb37213a69dd4"
 
 # Define headers with your full cookie
 headers = {
@@ -16,14 +16,12 @@ headers = {
     )
 }
 
-# Send the GET request
-response = requests.get(url, headers=headers)
+# Fetch the video page (or JSON)
+response = requests.get(video_url, headers=headers)
 
-# Output the result
-print("Status Code:", response.status_code)
-print("Response JSON:")
-
-try:
-    print(response.json())  # If the server responds with JSON
-except Exception as e:
-    print("Non-JSON response:", response.text)
+if response.status_code == 200:
+    with open("downloaded_video.mp4", "wb") as f:
+        f.write(response.content)
+    print("✅ Video downloaded successfully!")
+else:
+    print(f"❌ Failed to fetch video. Status code: {response.status_code}")
