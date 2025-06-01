@@ -7,19 +7,9 @@ import sys
 DOWNLOAD_FOLDER = "downloads"
 
 async def get_download_links(url):
-    download_urls = []
-
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)  # Set to True to hide browser
+        browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
-
-        # Capture requests for video files
-        async def on_request(request):
-            if request.url.endswith(('.mp4', '.mkv', '.avi', '.mov')):
-                print("🔗 Found downloadable URL:", request.url)
-                download_urls.append(request.url)
-
-        page.on("request", on_request)
 
         print(f"🌐 Going to {url}")
         await page.goto(url, wait_until="networkidle")
@@ -28,16 +18,31 @@ async def get_download_links(url):
             print("⏳ Waiting for and clicking Download button...")
             await page.wait_for_selector('button:has-text("Download")', timeout=10000)
             await page.click('button:has-text("Download")')
-            await page.wait_for_timeout(5000)  # wait for the download link or video request to load
+            await page.wait_for_timeout(3000)
         except Exception as e:
             print("⚠️ Could not find/click Download button:", e)
 
-        # Give some extra time for requests to fire
-        await page.wait_for_timeout(5000)
+        # After click, check for <a> tags with download URLs
+        # Try common selectors or text
+        download_link = None
+
+        # Try to find link by text containing 'Download' or ending with '.mp4'
+        anchors = await page.query_selector_all('a')
+        for a in anchors:
+            href = await a.get_attribute('href')
+            text = await a.inner_text()
+            if href and ('.mp4' in href or 'download' in text.lower()):
+                download_link = href
+                print(f"✅ Found download link: {download_link}")
+                break
 
         await browser.close()
 
-    return download_urls
+        if download_link:
+            return [download_link]
+        else:
+            return []
+
 
 
 def download_file(url):
