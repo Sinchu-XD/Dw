@@ -82,7 +82,7 @@ async def start_download(client: Client, message: Message):
         return
 
     share_url = parts[1]
-    if "terabox.com" not in share_url:
+    if "teraboxlink.com" not in share_url:
         await message.reply_text("❌ That doesn’t look like a TeraBox link.")
         return
 
