@@ -1,44 +1,38 @@
 import asyncio
 from playwright.async_api import async_playwright
-
-TARGET_URL = "https://www.diskwala.com/app/6841bb76b42bb37213c22007"
+import sys
 
 async def main():
+    if len(sys.argv) < 2:
+        print("❌ Please provide a DiskWala URL.")
+        return
+
+    url = sys.argv[1]
+    print(f"🔍 Opening: {url}")
+
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)  # Headless False to render everything
+        browser = await p.chromium.launch(headless=True)  # set headless=False to see browser
         context = await browser.new_context()
         page = await context.new_page()
 
-        print(f"🔍 Opening: {TARGET_URL}")
-        await page.goto(TARGET_URL)
+        await page.goto(url, wait_until="networkidle")
+        await page.wait_for_timeout(3000)  # small wait to allow JS rendering
 
-        # Wait for page to load completely
-        await page.wait_for_load_state("networkidle")
-
-        # Optional: Click on download button if it exists
         try:
             print("🖱️ Trying to click Download button...")
-            await page.click('text=Download', timeout=10000)
-        except Exception:
+            # Try a few possible selectors
+            await page.wait_for_selector("button:has-text('Download')", timeout=7000)
+            await page.click("button:has-text('Download')")
+        except Exception as e:
             print("⚠️ Download button not found or click failed")
-
-        # Monitor network requests
-        def log_video_requests(request):
-            url = request.url
-            headers = request.headers
-            if (
-                url.endswith(".mp4")
-                or "video" in headers.get("accept", "")
-                or "video" in headers.get("content-type", "")
-            ):
-                print(f"\n🎯 Video Request URL: {url}\n")
-
-        page.on("request", log_video_requests)
+            # For debugging, take a screenshot
+            await page.screenshot(path="debug.png", full_page=True)
 
         print("⏳ Waiting for network activity to reveal the video URL...")
-        await asyncio.sleep(15)  # Adjust as needed
+        await page.wait_for_timeout(5000)  # wait for requests to happen
 
-        await browser.close()
         print("✅ Done.")
+        await browser.close()
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
