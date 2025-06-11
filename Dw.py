@@ -15,34 +15,34 @@ HEADERS = {
     )
 }
 
-def extract_diskwala_video(url):
+def extract_video_from_network(url):
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(extra_http_headers=HEADERS)
         page = context.new_page()
-        print("🌐 Opening page...")
+        video_url = None
+
+        # Intercept responses to sniff .mp4 links
+        def handle_response(response):
+            nonlocal video_url
+            if ".mp4" in response.url:
+                video_url = response.url
+
+        page.on("response", handle_response)
+
+        print("🌐 Opening page and sniffing network...")
         page.goto(url, wait_until="networkidle")
 
-        # Optional wait in case JavaScript needs time
-        time.sleep(3)
-
-        # Try fetching download link from <a> or <video> or <iframe>
-        link = page.evaluate("""
-            () => {
-                const aTag = document.querySelector('a[href*=".mp4"], a.download-button');
-                const videoTag = document.querySelector('video source');
-                const iframe = document.querySelector('iframe');
-                return aTag?.href || videoTag?.src || iframe?.src || null;
-            }
-        """)
+        # Wait for JS to load and media to stream
+        time.sleep(10)
 
         browser.close()
 
-        if link:
-            print(f"✅ Video Link Found:\n{link}")
+        if video_url:
+            print(f"✅ Found video URL:\n{video_url}")
         else:
-            print("❌ No video download link found.")
-        return link
+            print("❌ No .mp4 video found in network traffic.")
+        return video_url
 
 if __name__ == "__main__":
-    extract_diskwala_video(URL)
+    extract_video_from_network(URL)
