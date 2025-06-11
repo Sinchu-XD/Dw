@@ -15,9 +15,8 @@ async def extract_video_url(url):
                 ct = response.headers.get("content-type", "")
                 if "application/json" in ct:
                     json_data = await response.json()
-                    if any(x in str(json_data).lower() for x in ['.mp4', '.m3u8', 'video']):
-                        print(f"\n✅ JSON from {response.url}")
-                        print(json_data)
+                    print(f"\n✅ JSON from {response.url}")
+                    print(json_data)
             except:
                 pass
 
