@@ -1,59 +1,57 @@
+from playwright.sync_api import sync_playwright
 import requests
 import uuid
+import os
 
-headers = {
+# Use your valid authenticated headers here if needed for download
+HEADERS = {
     "User-Agent": "Mozilla/5.0",
-    "Accept": "application/json, text/plain, */*",
-    "Origin": "https://diskwala.com",
-    "Referer": "https://diskwala.com/",
-    "Cookie": (
-        "_ga=GA1.1.468420041.1748796491; "
-        "rT=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODNjN2ViNmI0MmJiMzcyMTNhZTFkNTgiLCJuYW1lIjoiQWJoaSIsImVtYWlsIjoiYWJoaXNoZWtiYW5zaGl3YWwyMDA1QGdtYWlsLmNvbSIsInB1YmxpY19kZXRhaWxzIjp7InRpdGxlIjoiIiwibGluayI6IiIsImxvZ28iOiIifSwiZV92Ijp0cnVlLCJkX2EiOmZhbHNlLCJibG9ja2VkIjpmYWxzZSwicGFzc3dvcmQiOiIkMmEkMTAkU0tHY0NWQmdCbzJpZXJXV0VEV0dhZTJxRXJqSW9xR3g0L0w1VGRrQ25BSjBQd0JjcGlXdnEiLCJpYXQiOjE3NDg3OTY1MzgsImV4cCI6MTc0ODg4MjkzOH0.il07nKAxyLZjntr8GB_j2j5TkcMObJ1U1QKOH8y-OAs; "
-        "_ga_9CY1MQHST7=GS2.1.s1748796490$o1$g1$t1748797215$j59$l0$h0"
-    )
 }
 
-def get_video_info(file_id: str):
-    api_url = "https://udapi.diskwala.com/api/v1/file/temp_info"
-    response = requests.post(api_url, headers=headers, json={"_id": file_id})
+def extract_video_url(page_url: str) -> str:
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(page_url, wait_until="networkidle")
+        # Wait for the download link/button to load in the DOM
+        page.wait_for_selector('a[href*=".mp4"], a.download-button', timeout=20000)
+        # Extract first link that ends in .mp4
+        links = page.eval_on_selector_all(
+            'a[href*=".mp4"]',
+            'els => els.map(el => el.href)'
+        )
+        browser.close()
 
-    if response.status_code != 200:
-        print("❌ Failed to fetch file info:", response.status_code)
-        return None
+        if links:
+            return links[0]
+        else:
+            raise RuntimeError("No .mp4 link found on the page")
 
-    data = response.json()
-    try:
-        u_id = data["fileInfo"]["u_id"]
-        ext = data["fileInfo"]["extension"]
-        video_id = data["fileInfo"]["_id"]
-        name = data["fileInfo"]["name"]
-    except KeyError:
-        print("❌ Unexpected response format.")
-        return None
-
-    # Construct direct download URL
-    direct_url = f"https://udapi.diskwala.com/api/v1/file/download/{u_id}/{video_id}?ext={ext}"
-    return direct_url, name
-
-def download_video(video_url, filename):
+def download_video(video_url: str, save_name: str = None):
     print(f"📥 Downloading from: {video_url}")
-    with requests.get(video_url, headers=headers, stream=True) as r:
-        if r.status_code != 200:
-            print("❌ Download failed:", r.status_code)
-            return
-        with open(filename, "wb") as f:
-            for chunk in r.iter_content(chunk_size=8192):
-                if chunk:
-                    f.write(chunk)
-    print(f"✅ Download complete: {filename}")
+    resp = requests.get(video_url, headers=HEADERS, stream=True, timeout=60)
+    resp.raise_for_status()
+
+    if not save_name:
+        cd = resp.headers.get("Content-Disposition", "")
+        if "filename=" in cd:
+            save_name = cd.split("filename=")[-1].strip().strip('"')
+        else:
+            save_name = f"video_{uuid.uuid4().hex[:8]}.mp4"
+
+    with open(save_name, "wb") as f:
+        for chunk in resp.iter_content(chunk_size=8192):
+            f.write(chunk)
+
+    print(f"✅ Saved video as: {save_name}")
+    return save_name
 
 if __name__ == "__main__":
-    # Replace with your actual ID from the URL
-    file_id = "68493575b42bb37213de4311"
-
-    result = get_video_info(file_id)
-    if result:
-        direct_url, raw_name = result
-        filename = raw_name if raw_name.endswith(".mp4") else f"{uuid.uuid4().hex[:8]}.mp4"
-        download_video(direct_url, filename)
-      
+    import sys
+    url = sys.argv[1] if len(sys.argv) > 1 else "https://www.diskwala.com/app/6841bb76b42bb37213c22007"
+    try:
+        video_url = extract_video_url(url)
+        print("🔗 Found direct URL:", video_url)
+        download_video(video_url)
+    except Exception as e:
+        print("❌ Failed:", e)
