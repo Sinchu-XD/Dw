@@ -15,34 +15,30 @@ HEADERS = {
     )
 }
 
-def extract_video_from_network(url):
+def sniff_media_requests(url):
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(extra_http_headers=HEADERS)
         page = context.new_page()
-        video_url = None
+        media_links = []
 
-        # Intercept responses to sniff .mp4 links
         def handle_response(response):
-            nonlocal video_url
-            if ".mp4" in response.url:
-                video_url = response.url
+            if any(ext in response.url for ext in [".mp4", ".m3u8", ".mpd", ".ts"]):
+                print(f"🎯 Media: {response.url}")
+                media_links.append(response.url)
 
         page.on("response", handle_response)
 
-        print("🌐 Opening page and sniffing network...")
+        print("🌐 Sniffing media URLs...")
         page.goto(url, wait_until="networkidle")
-
-        # Wait for JS to load and media to stream
-        time.sleep(10)
+        time.sleep(15)  # Let JS and video load
 
         browser.close()
-
-        if video_url:
-            print(f"✅ Found video URL:\n{video_url}")
+        if media_links:
+            print(f"\n✅ Found {len(media_links)} media links.")
         else:
-            print("❌ No .mp4 video found in network traffic.")
-        return video_url
+            print("❌ No media links found.")
+        return media_links
 
 if __name__ == "__main__":
-    extract_video_from_network(URL)
+    sniff_media_requests(URL)
