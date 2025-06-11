@@ -1,44 +1,77 @@
-from playwright.sync_api import sync_playwright
-import time
+import asyncio
+from playwright.async_api import async_playwright
 
-URL = "https://www.diskwala.com/app/6841bb76b42bb37213c22007"
+async def intercept_requests(url):
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=False)  # Set headless=False for debugging
+        context = await browser.new_context()
+        page = await context.new_page()
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0",
-    "Accept": "application/json, text/plain, */*",
-    "Origin": "https://diskwala.com",
-    "Referer": "https://diskwala.com/",
-    "Cookie": (
-        "_ga=GA1.1.468420041.1748796491; "
-        "rT=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODNjN2ViNmI0MmJiMzcyMTNhZTFkNTgiLCJuYW1lIjoiQWJoaSIsImVtYWlsIjoiYWJoaXNoZWtiYW5zaGl3YWwyMDA1QGdtYWlsLmNvbSIsInB1YmxpY19kZXRhaWxzIjp7InRpdGxlIjoiIiwibGluayI6IiIsImxvZ28iOiIifSwiZV92Ijp0cnVlLCJkX2EiOmZhbHNlLCJibG9ja2VkIjpmYWxzZSwicGFzc3dvcmQiOiIkMmEkMTAkU0tHY0NWQmdCbzJpZXJXV0VEV0dhZTJxRXJqSW9xR3g0L0w1VGRrQ25BSjBQd0JjcGlXdnEiLCJpYXQiOjE3NDg3OTY1MzgsImV4cCI6MTc0ODg4MjkzOH0.il07nKAxyLZjntr8GB_j2j5TkcMObJ1U1QKOH8y-OAs; "
-        "_ga_9CY1MQHST7=GS2.1.s1748796490$o1$g1$t1748797215$j59$l0$h0"
-    )
-}
+        print(f"🌐 Opening: {url}")
 
-def sniff_media_requests(url):
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(extra_http_headers=HEADERS)
-        page = context.new_page()
-        media_links = []
+        # Intercept requests
+        page.on("request", lambda request: print(f"[REQ] {request.method} - {request.url}"))
 
-        def handle_response(response):
-            if any(ext in response.url for ext in [".mp4", ".m3u8", ".mpd", ".ts"]):
-                print(f"🎯 Media: {response.url}")
-                media_links.append(response.url)
+        # Intercept responses
+        async def handle_response(response):
+            try:
+                r_url = response.url
+                content_type = response.headers.get("content-type", "")
+
+                if r_url.endswith((".mp4", ".m3u8")):
+                    print(f"✅ Video Link Found: {r_url}")
+                elif "application/json" in content_type:
+                    json_data = await response.json()
+                    if any(k in str(json_data).lower() for k in ["file", "video", "url"]):
+                        print(f"[JSON] From {r_url}")
+                        print(json_data)
+            except Exception:
+                pass
 
         page.on("response", handle_response)
 
-        print("🌐 Sniffing media URLs...")
-        page.goto(url, wait_until="networkidle")
-        time.sleep(15)  # Let JS and video load
+        # Listen to console logs (some blobs are printed)
+        page.on("console", lambda msg: print(f"[CONSOLE] {msg.type}: {msg.text}"))
 
-        browser.close()
-        if media_links:
-            print(f"\n✅ Found {len(media_links)} media links.")
+        # Go to the main page
+        await page.goto(url, wait_until="networkidle")
+
+        # Try scanning iframe
+        iframes = page.frames
+        print(f"🔍 Found {len(iframes)} frame(s)")
+
+        for frame in iframes:
+            try:
+                content = await frame.content()
+                if ".mp4" in content or ".m3u8" in content:
+                    print("🎯 Possible video found in iframe HTML")
+            except:
+                continue
+
+        # Evaluate for blob or JS-loaded video
+        await page.wait_for_timeout(5000)
+        video_links = await page.evaluate("""
+        () => {
+            const links = [];
+            document.querySelectorAll('video, source').forEach(el => {
+                if (el.src) links.push(el.src);
+            });
+            return links;
+        }
+        """)
+
+        if video_links:
+            print("🎥 Video Tags Found:")
+            for link in video_links:
+                print(f"🎯 {link}")
         else:
-            print("❌ No media links found.")
-        return media_links
+            print("❌ No direct <video> tags found.")
+
+        await browser.close()
 
 if __name__ == "__main__":
-    sniff_media_requests(URL)
+    import sys
+    if len(sys.argv) != 2:
+        print("Usage: python3 Dw.py <DiskWala Video URL>")
+    else:
+        asyncio.run(intercept_requests(sys.argv[1]))
